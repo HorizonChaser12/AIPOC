@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Data Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Enhanced chart libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-wordcloud@4.3.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto max-w-4xl mt-8 p-6 bg-white rounded-lg shadow-xl">
+        <h1 class="text-3xl font-bold mb-6 text-center text-gray-700">Excel Data Explorer</h1>
+        
+        <!-- File Upload Section -->
+        <div class="mb-8 p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
+            <h2 class="text-xl font-semibold mb-3">Upload Your Excel File</h2>
+            <p class="text-gray-600 mb-4">Your data stays in your browser and is not uploaded to any server</p>
+            <input type="file" id="fileUpload" accept=".xlsx,.xls" class="hidden" />
+            <button id="uploadBtn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-lg shadow">
+                Select Excel File
+            </button>
+            <p id="fileName" class="mt-2 text-gray-600"></p>
+        </div>
+
+        <!-- API Key Input (for LLM integration) -->
+        <div id="apiKeySection" class="mb-8 p-6 border border-gray-200 rounded-lg bg-gray-50" style="display: none;">
+            <h2 class="text-xl font-semibold mb-3">LLM Integration</h2>
+            <p class="text-gray-600 mb-4">Enter your API key to enable AI-powered responses</p>
+            <div class="flex gap-2">
+                <select id="apiProvider" class="p-2 border rounded">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="browser">Use Browser LLM (No Key Required)</option>
+                </select>
+                <input type="password" id="apiKey" placeholder="Enter API Key" class="flex-1 p-2 border rounded" />
+                <button id="saveApiKey" class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded">Save</button>
+            </div>
+            <div class="flex items-center mt-2">
+                <input type="checkbox" id="rememberKey" class="mr-2" />
+                <label for="rememberKey" class="text-sm text-gray-600">Remember in browser storage</label>
+            </div>
+        </div>
+        
+        <!-- Query Section -->
+        <div id="querySection" class="mb-8" style="display: none;">
+            <div class="mb-6">
+                <label for="queryInput" class="block text-sm font-medium text-gray-700 mb-1">Enter your query:</label>
+                <textarea id="queryInput" rows="3" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., What are the main issues in this data?"></textarea>
+            </div>
+            
+            <button id="submitQuery" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-md shadow-md transition duration-150 ease-in-out">
+                Search
+            </button>
+        </div>
+
+        <div id="loader" class="loader"></div>
+        
+        <!-- Results Area -->
+        <div id="resultsArea" class="mt-8" style="display: none;">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">Results:</h2>
+            
+            <div id="response" class="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-md">
+                <h3 class="text-lg font-semibold text-indigo-700 mb-2">Generated Response:</h3>
+                <p class="text-gray-800"></p>
+            </div>
+            
+            <!-- Two-column layout for docs and charts -->
+            <div id="resultsPanels" class="flex flex-col md:flex-row md:space-x-4">
+                <!-- Retrieved Documents panel -->
+                <div id="retrievedDocs" class="w-full md:w-1/2 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Retrieved Documents:</h3>
+                    <div id="docsContainer"></div>
+                </div>
+                
+                <!-- Chart panel -->
+                <div id="chartPanel" class="w-full md:w-1/2 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Data Analysis:</h3>
+                    
+                    <!-- Chart navigation tabs -->
+                    <div class="flex border-b border-gray-200 mb-4">
+                        <button id="tab-distribution" class="px-4 py-2 border-b-2 border-indigo-500 text-indigo-600 font-medium">Distribution</button>
+                        <button id="tab-trends" class="px-4 py-2 text-gray-600 hover:text-gray-800">Trends</button>
+                        <button id="tab-relationships" class="px-4 py-2 text-gray-600 hover:text-gray-800">Relationships</button>
+                    </div>
+                    
+                    <!-- Chart containers -->
+                    <div id="chart-distribution" class="chart-container">
+                        <canvas id="distributionChart" class="w-full h-64"></canvas>
+                    </div>
+                    
+                    <div id="chart-trends" class="chart-container hidden">
+                        <canvas id="trendsChart" class="w-full h-64"></canvas>
+                    </div>
+                    
+                    <div id="chart-relationships" class="chart-container hidden">
+                        <canvas id="relationshipsChart" class="w-full h-64"></canvas>
+                    </div>
+                    
+                    <!-- Chart insights -->
+                    <div id="chartInsights" class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
+                        Select a column to visualize insights
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="errorArea" class="mt-4 p-4 bg-red-100 border border-red-300 text-red-700 rounded-md" style="display: none;">
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM elements
+            const fileUpload = document.getElementById('fileUpload');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const fileName = document.getElementById('fileName');
+            const apiKeySection = document.getElementById('apiKeySection');
+            const apiKeyInput = document.getElementById('apiKey');
+            const apiProvider = document.getElementById('apiProvider');
+            const saveApiKeyBtn = document.getElementById('saveApiKey');
+            const rememberKeyCheck = document.getElementById('rememberKey');
+            const querySection = document.getElementById('querySection');
+            const queryInput = document.getElementById('queryInput');
+            const submitQuery = document.getElementById('submitQuery');
+            const resultsArea = document.getElementById('resultsArea');
+            const responseDiv = document.getElementById('response').querySelector('p');
+            const retrievedDocsDiv = document.getElementById('retrievedDocs');
+            const docsContainer = document.getElementById('docsContainer');
+            const chartPanel = document.getElementById('chartPanel');
+            const loader = document.getElementById('loader');
+            const errorArea = document.getElementById('errorArea');
+            
+            // Application state
+            let excelData = [];
+            let searchIndex = null;
+            let apiKey = '';
+            let apiType = 'openai';
+            let chart = null;
+            
+            // Check for saved API key
+            const savedApiKey = localStorage.getItem('api_key');
+            const savedApiType = localStorage.getItem('api_type');
+            if (savedApiKey) {
+                apiKeyInput.value = savedApiKey;
+                rememberKeyCheck.checked = true;
+                apiKey = savedApiKey;
+            }
+            if (savedApiType) {
+                apiProvider.value = savedApiType;
+                apiType = savedApiType;
+            }
+            
+            // File upload handling
+            uploadBtn.addEventListener('click', () => {
+                fileUpload.click();
+            });
+            
+            fileUpload.addEventListener('change', function(e) {
+                if (!e.target.files.length) return;
+                
+                const file = e.target.files[0];
+                fileName.textContent = file.name;
+                
+                // Show loader
+                loader.style.display = 'block';
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        
+                        // Get first sheet
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        
+                        // Convert to JSON
+                        excelData = XLSX.utils.sheet_to_json(worksheet);
+                        console.log('Excel data loaded:', excelData.length, 'rows');
+                        
+                        // Build search index
+                        searchIndex = createSearchIndex(excelData);
+                        console.log('Search index created');
+                        
+                        // Create initial data visualization
+                        createSummaryChart(excelData);
+                        
+                        // Show API key input and query sections
+                        apiKeySection.style.display = 'block';
+                        querySection.style.display = 'block';
+                        
+                        // Hide loader
+                        loader.style.display = 'none';
+                        
+                        // Display success
+                        displayMessage('Data loaded successfully! Enter a query to explore your data.');
+                    } catch(error) {
+                        console.error('Error processing file:', error);
+                        displayError('Error processing Excel file: ' + error.message);
+                        loader.style.display = 'none';
+                    }
+                };
+                reader.onerror = function() {
+                    displayError('Error reading file');
+                    loader.style.display = 'none';
+                };
+                reader.readAsArrayBuffer(file);
+            });
+            
+            // API key handling
+            saveApiKeyBtn.addEventListener('click', () => {
+                apiKey = apiKeyInput.value.trim();
+                apiType = apiProvider.value;
+                
+                if (apiType === 'browser') {
+                    displayMessage('Using browser-based LLM (limited capabilities but no API key required)');
+                } else if (apiKey) {
+                    displayMessage('API key saved');
+                    if (rememberKeyCheck.checked) {
+                        localStorage.setItem('api_key', apiKey);
+                        localStorage.setItem('api_type', apiType);
+                    } else {
+                        localStorage.removeItem('api_key');
+                        localStorage.removeItem('api_type');
+                    }
+                } else {
+                    displayError('Please enter an API key or select browser-based LLM');
+                    return;
+                }
+                
+                // Focus on query input
+                queryInput.focus();
+            });
+            
+            // Query submission
+            submitQuery.addEventListener('click', async () => {
+                const query = queryInput.value.trim();
+                if (!query) {
+                    displayError('Please enter a query');
+                    return;
+                }
+                
+                if (!excelData.length) {
+                    displayError('Please upload an Excel file first');
+                    return;
+                }
+                
+                // Clear previous results
+                responseDiv.innerHTML = '';
+                docsContainer.innerHTML = '';
+                errorArea.style.display = 'none';
+                
+                // Show loader
+                loader.style.display = 'block';
+                
+                try {
+                    // Search for relevant documents
+                    const searchResults = search(query, searchIndex);
+                    console.log('Search results:', searchResults);
+                    
+                    // Display retrieved documents
+                    displayRetrievedDocs(searchResults);
+                    
+                    // Create pattern analysis
+                    const patterns = analyzePatterns(searchResults);
+                    updateChart(patterns);
+                    
+                    // Format context for LLM
+                    const context = formatContextForLLM(excelData); // Changed from searchResults to excelData
+                    
+                    // Generate LLM response
+                    let llmResponse;
+                    if (apiType === 'browser') {
+                        llmResponse = generateBasicResponse(query, searchResults);
+                    } else {
+                        llmResponse = await generateLLMResponse(query, context);
+                    }
+                    
+                    // Display response
+                    responseDiv.innerHTML = beautifyResponse(llmResponse);
+                    
+                    // Show results area
+                    resultsArea.style.display = 'block';
+                    
+                } catch (error) {
+                    console.error('Error processing query:', error);
+                    displayError(`Error processing query: ${error.message}`);
+                } finally {
+                    // Hide loader
+                    loader.style.display = 'none';
+                }
+            });
+            
+            // Search index creation
+            function createSearchIndex(documents) {
+                // Simple TF-IDF implementation
+                const terms = {};
+                const docs = [];
+                
+                documents.forEach((doc, docIndex) => {
+                    // Combine all fields into a single text
+                    const text = Object.values(doc).join(' ').toLowerCase();
+                    const words = text.split(/\W+/).filter(word => word.length > 2);
+                    
+                    docs.push({
+                        id: docIndex,
+                        content: doc,
+                        terms: {}
+                    });
+                    
+                    // Count term frequency
+                    words.forEach(word => {
+                        if (!terms[word]) terms[word] = { df: 0, docs: {} };
+                        if (!terms[word].docs[docIndex]) {
+                            terms[word].docs[docIndex] = 0;
+                            terms[word].df++;
+                        }
+                        terms[word].docs[docIndex]++;
+                        docs[docIndex].terms[word] = (docs[docIndex].terms[word] || 0) + 1;
+                    });
+                });
+                
+                return { terms, docs, count: documents.length };
+            }
+            
+            // Search function
+            function search(query, index) {
+                const queryTerms = query.toLowerCase().split(/\W+/).filter(word => word.length > 2);
+                const scores = {};
+                
+                queryTerms.forEach(term => {
+                    if (!index.terms[term]) return;
+                    
+                    const idf = Math.log(index.count / index.terms[term].df);
+                    
+                    Object.entries(index.terms[term].docs).forEach(([docId, tf]) => {
+                        docId = parseInt(docId);
+                        scores[docId] = (scores[docId] || 0) + tf * idf;
+                    });
+                });
+                
+                // Return top results
+                return Object.entries(scores)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10) // Changed from 5 to 10
+                    .map(([docId, score]) => ({
+                        id: parseInt(docId),
+                        content: index.docs[docId].content,
+                        score: score
+                    }));
+            }
+            
+            // Pattern analysis function
+            function analyzePatterns(results) {
+                const patterns = {};
+                
+                // Find columns with categorical data
+                const columns = results.length > 0 ? Object.keys(results[0].content) : [];
+                
+                columns.forEach(column => {
+                    const values = {};
+                    let uniqueValues = 0;
+                    
+                    results.forEach(result => {
+                        const value = result.content[column];
+                        if (value !== undefined && value !== null) {
+                            if (!values[value]) {
+                                values[value] = 0;
+                                uniqueValues++;
+                            }
+                            values[value]++;
+                        }
+                    });
+                    
+                    // Only include columns with a reasonable number of unique values
+                    if (uniqueValues > 1 && uniqueValues < 10) {
+                        patterns[column] = values;
+                    }
+                });
+                
+                return patterns;
+            }
+            
+            // Chart creation
+            function createSummaryChart(data) {
+                // Find a good column to visualize
+                const columnCounts = {};
+                
+                // Get all columns
+                const allColumns = data.length > 0 ? Object.keys(data[0]) : [];
+                
+                // Count unique values in each column
+                allColumns.forEach(column => {
+                    const uniqueValues = new Set();
+                    data.forEach(row => {
+                        if (row[column] !== undefined && row[column] !== null) {
+                            uniqueValues.add(row[column]);
+                        }
+                    });
+                    columnCounts[column] = uniqueValues.size;
+                });
+                
+                // Find a good candidate column (not too many unique values)
+                let bestColumn = null;
+                Object.entries(columnCounts).forEach(([column, count]) => {
+                    if (count > 1 && count < 10 && (!bestColumn || count < columnCounts[bestColumn])) {
+                        bestColumn = column;
+                    }
+                });
+                
+                // If no good column found, use the first one
+                if (!bestColumn && allColumns.length > 0) {
+                    bestColumn = allColumns[0];
+                }
+                
+                // Create chart with the selected column
+                if (bestColumn) {
+                    const categories = {};
+                    
+                    data.forEach(item => {
+                        const value = item[bestColumn] || 'Unknown';
+                        categories[value] = (categories[value] || 0) + 1;
+                    });
+                    
+                    const ctx = document.getElementById('distributionChart').getContext('2d');
+                    
+                    chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(categories),
+                            datasets: [{
+                                label: `${bestColumn}`,
+                                data: Object.values(categories),
+                                backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                                borderColor: 'rgba(99, 102, 241, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+            }
+            
+            // Update chart with new data
+            function updateChart(patterns) {
+                if (!patterns || Object.keys(patterns).length === 0) return;
+                
+                // Select the first pattern with the most interesting distribution
+                const patternKey = Object.keys(patterns)[0];
+                const patternValues = patterns[patternKey];
+                
+                if (chart) {
+                    chart.destroy();
+                }
+                
+                const ctx = document.getElementById('distributionChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(patternValues),
+                        datasets: [{
+                            label: patternKey,
+                            data: Object.values(patternValues),
+                            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                            borderColor: 'rgba(99, 102, 241, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            }
+            
+            // Display retrieved documents
+            function displayRetrievedDocs(results) {
+                docsContainer.innerHTML = '';
+                
+                if (results.length === 0) {
+                    docsContainer.innerHTML = '<p class="text-gray-600">No relevant documents found.</p>';
+                    return;
+                }
+                
+                results.forEach((result, idx) => {
+                    const docCard = document.createElement('div');
+                    docCard.className = 'mb-4 p-4 border border-gray-200 rounded-md bg-gray-50';
+                    
+                    let contentHTML = `<h4 class="font-semibold text-md text-gray-800 mb-2">Document #${idx + 1}</h4>`;
+                    
+                    for (const [key, value] of Object.entries(result.content)) {
+                        contentHTML += `<p class="text-sm text-gray-600"><strong>${formatKey(key)}:</strong> ${formatValue(value)}</p>`;
+                    }
+                    
+                    contentHTML += `<p class="text-sm text-gray-600 mt-2"><strong>Relevance Score:</strong> ${(result.score * 100).toFixed(2)}</p>`;
+                    
+                    docCard.innerHTML = contentHTML;
+                    docsContainer.appendChild(docCard);
+                });
+            }
+            
+            // Format context for LLM
+            function formatContextForLLM(dataToFormat) { // Changed parameter name from searchResults to dataToFormat
+                if (!dataToFormat || dataToFormat.length === 0) {
+                    return '';
+                }
+
+                // Convert array of objects to CSV string
+                const headers = Object.keys(dataToFormat[0]);
+                let csvString = headers.join(',') + '\\n';
+
+                dataToFormat.forEach(row => {
+                    const rowValues = headers.map(header => {
+                        let value = row[header];
+                        if (typeof value === 'string' && (value.includes(',') || value.includes('\\n') || value.includes('"'))) {
+                            // Escape quotes and wrap in double quotes if value contains comma, newline, or quote
+                            value = '"' + value.replace(/"/g, '""') + '"';
+                        }
+                        return value;
+                    });
+                    csvString += rowValues.join(',') + '\\n';
+                });
+                
+                return csvString;
+            }
+            
+            // Generate LLM response using API
+            async function generateLLMResponse(query, context) {
+                if (!apiKey && apiType !== 'browser') {
+                    throw new Error('API key not provided');
+                }
+                
+                let endpoint, payload;
+                
+                if (apiType === 'openai') {
+                    endpoint = 'https://api.openai.com/v1/chat/completions';
+                    payload = {
+                        model: 'gpt-3.5-turbo',
+                        messages: [
+                            {role: 'system', content: 'You are a helpful assistant analyzing Excel data.'},
+                            {role: 'user', content: `Based on the following data:\n${context}\n\nQuestion: ${query}`}
+                        ],
+                        temperature: 0.7
+                    };
+                } else if (apiType === 'anthropic') {
+                    endpoint = 'https://api.anthropic.com/v1/messages';
+                    payload = {
+                        model: 'claude-3-sonnet-20240229',
+                        messages: [
+                            {role: 'user', content: `Based on the following data:\\n${context}\\n\\nQuestion: ${query}`}
+                        ],
+                        max_tokens: 1000
+                    };
+                } else if (apiType === 'gemini') {
+                    endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+                    payload = {
+                        contents: [{
+                            parts: [{
+                                text: `Based on the following data:\\n${context}\\n\\nQuestion: ${query}`
+                            }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.7
+                        }
+                    };
+                } else {
+                    return generateBasicResponse(query, context);
+                }
+                
+                const fetchHeaders = {
+                    'Content-Type': 'application/json'
+                };
+                if (apiType !== 'gemini') {
+                    fetchHeaders['Authorization'] = `Bearer ${apiKey}`;
+                }
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: fetchHeaders,
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error: ${response.status} - ${errorText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Extract response based on API type
+                if (apiType === 'openai') {
+                    return data.choices[0].message.content;
+                } else if (apiType === 'anthropic') {
+                    return data.content[0].text;
+                } else if (apiType === 'gemini') {
+                    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+                        return data.candidates[0].content.parts[0].text;
+                    } else {
+                        console.error('Gemini API response error:', data);
+                        throw new Error('Invalid response structure from Gemini API');
+                    }
+                }
+                
+                return 'Error: Unsupported API type';
+            }
+            
+            // Generate a basic response without LLM
+            function generateBasicResponse(query, searchResults) {
+                // This is a fallback when no API is available
+                const resultCount = searchResults.length;
+                
+                if (resultCount === 0) {
+                    return `No results found for "${query}".`;
+                }
+                
+                let response = `Found ${resultCount} relevant documents for "${query}".\n\n`;
+                
+                // Try to extract key information
+                const patterns = analyzePatterns(searchResults);
+                if (Object.keys(patterns).length > 0) {
+                    response += '**Key Patterns Identified:**\n\n';
+                    
+                    Object.entries(patterns).forEach(([column, values]) => {
+                        response += `* **${formatKey(column)}**: `;
+                        const entries = Object.entries(values)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([value, count]) => `${value} (${count})`);
+                        response += entries.join(', ') + '\n';
+                    });
+                }
+                
+                response += '\nThis is a basic analysis. For more sophisticated insights, please provide an API key.';
+                
+                return response;
+            }
+            
+            // Helper functions
+            function formatKey(key) {
+                return key.split(/(?=[A-Z])/).join(' ');
+            }
+            
+            function formatValue(value) {
+                if (value === null || value === undefined) return '';
+                if (typeof value === 'string') return value;
+                if (typeof value === 'number') return value.toString();
+                if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+                if (value instanceof Date) return value.toLocaleDateString();
+                return JSON.stringify(value);
+            }
+            
+            function convertMarkdownToHtml(text) {
+                if (!text) return '';
+                
+                // Convert bullet points
+                text = text.replace(/^[ ]*\* (.*)$/gm, '<li>$1</li>');
+                text = text.replace(/^[ ]*- (.*)$/gm, '<li>$1</li>');
+                
+                // Convert bold text
+                text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                
+                // Convert italic text
+                text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                // Wrap lists in ul tags
+                if (text.includes('<li>')) {
+                    text = '<ul class="list-disc pl-5 mb-3">' + text + '</ul>';
+                }
+                
+                return text;
+            }
+            
+            function beautifyResponse(text) {
+                return text.split('\n')
+                    .filter(p => p.trim())
+                    .map(p => `<p class="mb-3">${convertMarkdownToHtml(p)}</p>`)
+                    .join('');
+            }
+            
+            function displayError(message) {
+                errorArea.textContent = message;
+                errorArea.style.display = 'block';
+                loader.style.display = 'none';
+            }
+            
+            function displayMessage(message) {
+                responseDiv.innerHTML = `<p class="mb-3">${message}</p>`;
+                resultsArea.style.display = 'block';
+                loader.style.display = 'none';
+            }
+            
+            // Tab navigation for charts
+            const tabs = document.querySelectorAll('#chartPanel button');
+            const chartContainers = document.querySelectorAll('.chart-container');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const target = tab.id.split('-')[1];
+                    
+                    // Hide all chart containers
+                    chartContainers.forEach(container => {
+                        container.classList.add('hidden');
+                    });
+                    
+                    // Remove active class from all tabs
+                    tabs.forEach(t => {
+                        t.classList.remove('border-indigo-500', 'text-indigo-600', 'font-medium');
+                        t.classList.add('text-gray-600', 'hover:text-gray-800');
+                    });
+                    
+                    // Show the selected chart container
+                    document.getElementById(`chart-${target}`).classList.remove('hidden');
+                    
+                    // Add active class to the selected tab
+                    tab.classList.add('border-indigo-500', 'text-indigo-600', 'font-medium');
+                    tab.classList.remove('text-gray-600', 'hover:text-gray-800');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
