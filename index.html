@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Data Explorer</title>
+    <title>autonomous QE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Enhanced chart libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -31,15 +31,16 @@
 </head>
 <body class="bg-gray-100 font-sans">
     <div class="container mx-auto max-w-4xl mt-8 p-6 bg-white rounded-lg shadow-xl">
-        <h1 class="text-3xl font-bold mb-6 text-center text-gray-700">Excel Data Explorer</h1>
+        <img src="image.png" alt="Logo" class="w-24 mx-auto mb-4">
+        <h1 class="text-3xl font-bold mb-6 text-center text-gray-700">autonomous QE</h1>
         
         <!-- File Upload Section -->
         <div class="mb-8 p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
-            <h2 class="text-xl font-semibold mb-3">Upload Your Excel File</h2>
-            <p class="text-gray-600 mb-4">Your data stays in your browser and is not uploaded to any server</p>
+            <h2 class="text-xl font-semibold mb-3">Upload Your File to get Insights</h2>
+            <p class="text-gray-600 mb-4">Your data stays in your browser and is not uploaded to any server.</p>
             <input type="file" id="fileUpload" accept=".xlsx,.xls" class="hidden" />
             <button id="uploadBtn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-lg shadow">
-                Select Excel File
+                Select File
             </button>
             <p id="fileName" class="mt-2 text-gray-600"></p>
         </div>
@@ -63,16 +64,20 @@
                 <label for="rememberKey" class="text-sm text-gray-600">Remember in browser storage</label>
             </div>
         </div>
-        
-        <!-- Query Section -->
+          <!-- Query Section -->
         <div id="querySection" class="mb-8" style="display: none;">
-            <div class="mb-6">
-                <label for="queryInput" class="block text-sm font-medium text-gray-700 mb-1">Enter your query:</label>
-                <textarea id="queryInput" rows="3" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., What are the main issues in this data?"></textarea>
+            <div class="mb-6 bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+                <label for="queryInput" class="block text-lg font-medium text-gray-700 mb-3">Ask anything about your data:</label>
+                <textarea id="queryInput" rows="3" class="w-full p-4 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-base" 
+                    placeholder="Try questions like:&#10;• What are the top issues reported in February 2025?&#10;• Show me a breakdown of defects by component and create a chart"></textarea>
+                <div class="mt-2 text-xs text-gray-500">Pro tip: Include "create a chart" or "visualize" in your query for automatic visualization</div>
             </div>
             
-            <button id="submitQuery" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-md shadow-md transition duration-150 ease-in-out">
-                Search
+            <button id="submitQuery" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-4 px-4 rounded-lg shadow-md transition duration-150 ease-in-out text-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                </svg>
+                Analyze Data
             </button>
         </div>
 
@@ -81,38 +86,33 @@
         <!-- Results Area -->
         <div id="resultsArea" class="mt-8" style="display: none;">
             <h2 class="text-2xl font-semibold mb-4 text-gray-700">Results:</h2>
-            
-            <div id="response" class="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-md">
-                <h3 class="text-lg font-semibold text-indigo-700 mb-2">Generated Response:</h3>
-                <p class="text-gray-800"></p>
+              <div id="response" class="mb-6 p-6 bg-indigo-50 border border-indigo-200 rounded-md shadow-sm">
+                <h3 class="text-xl font-semibold text-indigo-700 mb-3 border-b border-indigo-100 pb-2">Generated Response:</h3>
+                <p class="text-gray-800 text-base leading-relaxed"></p>
             </div>
             
             <!-- Two-column layout for docs and charts -->
             <div id="resultsPanels" class="flex flex-col md:flex-row md:space-x-4">
-                <!-- Documents Panel -->
-                <div id="retrievedDocs" class="w-full md:w-1/2 p-4 border border-gray-200 rounded-md bg-white">
-                    <h3 class="text-xl font-semibold mb-4 text-gray-700">Retrieved Documents</h3>
-                    <div id="docsContainer" class="max-h-96 overflow-y-auto"></div>
+                <!-- Documents Panel -->                <div id="retrievedDocs" class="w-full md:w-1/2 p-5 border border-gray-200 rounded-md bg-white shadow-sm">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2 border-gray-200">Retrieved Documents</h3>
+                    <div id="docsContainer" class="max-h-96 overflow-y-auto pr-1"></div>
                 </div>
-                
-                <!-- Charts Panel -->
-                <div id="chartPanel" class="w-full md:w-1/2 p-4 border border-gray-200 rounded-md bg-white mt-4 md:mt-0">
-                    <div class="border-b border-gray-200 mb-4">
-                        <nav class="-mb-px flex space-x-4" aria-label="Tabs">
-                            <button id="tab-distribution" type="button" class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-indigo-500 text-indigo-600">
-                                Pattern Analysis
-                            </button>
-                            <button id="tab-llm" type="button" class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-600 hover:text-gray-800 hover:border-gray-300">
+                  <!-- Charts Panel -->                <div id="chartPanel" class="w-full md:w-1/2 p-5 border border-gray-200 rounded-md bg-white mt-4 md:mt-0 shadow-sm">
+                    <div class="border-b border-gray-200 mb-5">
+                        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                            <button id="tab-llm" type="button" class="whitespace-nowrap py-3 px-3 border-b-2 font-medium text-sm border-indigo-500 text-indigo-600">
                                 LLM Visualization
                             </button>
+                            <button id="tab-distribution" type="button" class="whitespace-nowrap py-3 px-3 border-b-2 font-medium text-sm text-gray-600 hover:text-gray-800 hover:border-gray-300">
+                                Pattern Analysis
+                            </button>
                         </nav>
-                    </div>
-                    <div id="chart-distribution" class="chart-container">
-                        <canvas id="distributionChart" height="300"></canvas>
+                    </div><div id="chart-distribution" class="chart-container">
+                        <canvas id="distributionChart" height="400"></canvas>
                     </div>
                     <div id="chart-llm" class="chart-container hidden">
-                        <canvas id="llmChartCanvas" height="300"></canvas>
-                        <div id="llmChartMessage" class="text-center text-gray-500 py-10">LLM visualization will appear here.</div>
+                        <canvas id="llmChartCanvas" height="400"></canvas>
+                        <div id="llmChartMessage" class="text-center text-gray-500 py-10 mt-4 bg-gray-50 rounded p-4">LLM visualization will appear here.</div>
                     </div>
                 </div>
             </div>
@@ -236,7 +236,7 @@
                         displayMessage('Data loaded successfully! Enter a query to explore your data.');
                     } catch(error) {
                         console.error('Error processing file:', error);
-                        displayError('Error processing Excel file: ' + error.message);
+                        displayError('Error processing file: ' + error.message);
                         loader.style.display = 'none';
                     }
                 };
@@ -281,7 +281,7 @@
                 }
                 
                 if (!excelData.length) {
-                    displayError('Please upload an Excel file first');
+                    displayError('Please upload an file first');
                     return;
                 }
                 
@@ -333,17 +333,26 @@
                     }
 
                     // Display text response
-                    responseDiv.innerHTML = beautifyResponse(textForDisplay);
-
-                    // Render LLM chart if data was parsed
+                    responseDiv.innerHTML = beautifyResponse(textForDisplay);                    // Render LLM chart if data was parsed
                     if (chartData) {
                         renderLLMChart(chartData);
                         // Message will be hidden by renderLLMChart on success
+                        
+                        // Auto-select the LLM visualization tab when chart is available
+                        document.getElementById('tab-llm').click();
                     } else {
                         document.getElementById('llmChartMessage').textContent = 'No chart data provided by LLM or error in parsing.';
                         document.getElementById('llmChartMessage').classList.remove('hidden');
                     }
                     
+                    // Identify which docs LLM refers to
+                    const referenced = parseReferencedDocs(fullLLMResponse);
+                    if (referenced.length) {
+                        // Filter results to only those referenced
+                        const filtered = searchResults.filter((_, idx) => referenced.includes(idx + 1));
+                        displayRetrievedDocs(filtered);
+                    }
+
                     // Show results area
                     resultsArea.style.display = 'block';
                     
@@ -511,8 +520,7 @@
                     });
                 }
             }
-            
-            // Update chart with new data
+              // Update chart with new data
             function updateChart(patterns) {
                 if (!patterns || Object.keys(patterns).length === 0) return;
                 
@@ -524,56 +532,136 @@
                     chart.destroy();
                 }
                 
+                // Generate a nice color palette
+                const generateColors = (count) => {
+                    const colors = [];
+                    const backgroundColors = [];
+                    const baseColors = [
+                        [99, 102, 241],   // indigo
+                        [79, 70, 229],    // purple
+                        [59, 130, 246],   // blue
+                        [16, 185, 129],   // green
+                        [245, 158, 11],   // amber
+                        [239, 68, 68],    // red
+                        [236, 72, 153]    // pink
+                    ];
+                    
+                    for (let i = 0; i < count; i++) {
+                        const colorSet = baseColors[i % baseColors.length];
+                        backgroundColors.push(`rgba(${colorSet[0]}, ${colorSet[1]}, ${colorSet[2]}, 0.6)`);
+                        colors.push(`rgba(${colorSet[0]}, ${colorSet[1]}, ${colorSet[2]}, 1)`);
+                    }
+                    
+                    return { backgrounds: backgroundColors, borders: colors };
+                };
+                
+                const labels = Object.keys(patternValues);
+                const colorSets = generateColors(labels.length);
+                
                 const ctx = document.getElementById('distributionChart').getContext('2d');
                 chart = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: Object.keys(patternValues),
+                        labels: labels,
                         datasets: [{
-                            label: patternKey,
+                            label: formatKey(patternKey),
                             data: Object.values(patternValues),
-                            backgroundColor: 'rgba(99, 102, 241, 0.5)',
-                            borderColor: 'rgba(99, 102, 241, 1)',
-                            borderWidth: 1
+                            backgroundColor: colorSets.backgrounds,
+                            borderColor: colorSets.borders,
+                            borderWidth: 1,
+                            barPercentage: 0.7,
+                            borderRadius: 4
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `Distribution of ${formatKey(patternKey)}`,
+                                font: { size: 16, weight: 'bold' }
+                            },
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    boxWidth: 12,
+                                    usePointStyle: true,
+                                    padding: 15
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0,0,0,0.8)',
+                                padding: 10,
+                                titleFont: { size: 14 },
+                                bodyFont: { size: 13 },
+                                displayColors: true
+                            }
+                        },
                         scales: {
-                            y: { beginAtZero: true }
+                            y: { 
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Count',
+                                    font: {
+                                        weight: 'bold'
+                                    }
+                                },
+                                ticks: {
+                                    precision: 0
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: formatKey(patternKey),
+                                    font: {
+                                        weight: 'bold'
+                                    }
+                                }
+                            }
                         }
                     }
                 });
             }
-            
-            // Display retrieved documents
+              // Display retrieved documents
             function displayRetrievedDocs(results) {
                 docsContainer.innerHTML = '';
                 
                 if (results.length === 0) {
-                    docsContainer.innerHTML = '<p class="text-gray-600">No relevant documents found.</p>';
+                    docsContainer.innerHTML = '<div class="p-6 bg-gray-50 rounded text-center"><p class="text-gray-600">No relevant documents found.</p></div>';
                     return;
                 }
                 
                 results.forEach((result, idx) => {
                     const docCard = document.createElement('div');
-                    docCard.className = 'mb-4 p-4 border border-gray-200 rounded-md bg-gray-50';
+                    docCard.className = 'mb-5 p-4 border border-gray-200 rounded-md bg-gray-50 hover:border-indigo-200 transition-all shadow-sm';
                     
-                    let contentHTML = `<h4 class="font-semibold text-md text-gray-800 mb-2">Document #${idx + 1}</h4>`;
+                    let contentHTML = `<h4 class="font-semibold text-md text-indigo-700 mb-3 pb-1 border-b border-gray-200">Document #${idx + 1}</h4>`;
+                    
+                    // Create a table for better data display
+                    contentHTML += '<div class="overflow-hidden">';
+                    contentHTML += '<table class="min-w-full divide-y divide-gray-200">';
+                    contentHTML += '<tbody class="divide-y divide-gray-100">';
                     
                     for (const [key, value] of Object.entries(result.content)) {
-                        contentHTML += `<p class="text-sm text-gray-600"><strong>${formatKey(key)}:</strong> ${formatValue(value)}</p>`;
+                        contentHTML += `
+                        <tr>
+                            <td class="py-1 px-2 text-sm font-medium text-gray-900">${formatKey(key)}</td>
+                            <td class="py-1 px-2 text-sm text-gray-700">${formatValue(value)}</td>
+                        </tr>`;
                     }
                     
-                    contentHTML += `<p class="text-sm text-gray-600 mt-2"><strong>Relevance Score:</strong> ${(result.score * 100).toFixed(2)}</p>`;
+                    contentHTML += '</tbody></table></div>';
+                    contentHTML += `<p class="text-xs text-gray-500 mt-3 pt-2 border-t border-gray-100"><span class="font-medium">Relevance:</span> ${(result.score * 100).toFixed(2)}</p>`;
                     
                     docCard.innerHTML = contentHTML;
                     docsContainer.appendChild(docCard);
                 });
             }
-            
-            // Format context for LLM
+              // Format context for LLM
             function formatContextForLLM(dataToFormat) { // Changed parameter name from searchResults to dataToFormat
                 if (!dataToFormat || dataToFormat.length === 0) {
                     return '';
@@ -581,31 +669,45 @@
 
                 // Convert array of objects to CSV string
                 const headers = Object.keys(dataToFormat[0]);
-                let csvString = headers.join(',') + '\\n';
-
+                let csvString = headers.join(',') + '\n';
+                
                 dataToFormat.forEach(row => {
                     const rowValues = headers.map(header => {
                         let value = row[header];
-                        if (typeof value === 'string' && (value.includes(',') || value.includes('\\n') || value.includes('"'))) {
+                        
+                        // Format dates consistently as YYYY-MM-DD
+                        if (value instanceof Date && !isNaN(value.getTime())) {
+                            const year = value.getFullYear();
+                            const month = String(value.getMonth() + 1).padStart(2, '0');
+                            const day = String(value.getDate()).padStart(2, '0');
+                            value = `${year}-${month}-${day}`;
+                        }
+                        
+                        if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
                             // Escape quotes and wrap in double quotes if value contains comma, newline, or quote
                             value = '"' + value.replace(/"/g, '""') + '"';
                         }
                         return value;
                     });
-                    csvString += rowValues.join(',') + '\\n';
+                    csvString += rowValues.join(',') + '\n';
                 });
                 
                 return csvString;
             }
-            
-            // Generate LLM response using API
+              // Generate LLM response using API
             async function generateLLMResponse(query, context) {
                 if (!apiKey && apiType !== 'browser') {
                     throw new Error('API key not provided');
                 }
                 
                 let endpoint, payload;
+                
                 const chartInstruction = `
+All dates in the data are formatted as YYYY-MM-DD (ISO format). When processing date-related queries:
+1. Interpret natural language date references like "February 2025", "last month", or "next quarter" correctly.
+2. For date comparisons, first convert the string dates to proper date objects.
+3. When filtering by date ranges, ensure the proper chronological order.
+
 If the query asks for a visualization, or if a chart would be helpful to illustrate the answer, provide a Chart.js compatible JSON object within a markdown code block like this:
 \`\`\`json
 {
@@ -613,25 +715,47 @@ If the query asks for a visualization, or if a chart would be helpful to illustr
   "data": {
     "labels": ["Label1", "Label2", "Label3"],
     "datasets": [{
-      "label": "Dataset Label",
+      "label": "Dataset Label", // Make this descriptive to explain what the chart is showing
       "data": [10, 20, 30],
       "backgroundColor": ["rgba(255, 99, 132, 0.2)", "rgba(54, 162, 235, 0.2)", "rgba(255, 206, 86, 0.2)"],
       "borderColor": ["rgba(255, 99, 132, 1)", "rgba(54, 162, 235, 1)", "rgba(255, 206, 86, 1)"],
       "borderWidth": 1
     }]
   },
-  "options": { // Optional: include if you want to customize options like scales, tooltips, legend
+  "options": { 
     "responsive": true,
     "maintainAspectRatio": false,
+    "plugins": {
+      "title": {
+        "display": true,
+        "text": "Chart Title Here", // Always include a descriptive title explaining what the chart shows
+        "font": { "size": 16 }
+      },
+      "subtitle": {
+        "display": true,
+        "text": "Additional explanation about what this visualization represents", // Explain the chart data
+        "font": { "size": 14 }
+      }
+    },
     "scales": {
       "y": {
-        "beginAtZero": true
+        "beginAtZero": true,
+        "title": {
+          "display": true,
+          "text": "Y-Axis Label" // Always label your axes
+        }
+      },
+      "x": {
+        "title": {
+          "display": true,
+          "text": "X-Axis Label" // Always label your axes
+        }
       }
     }
   }
 }
 \`\`\`
-Ensure the JSON is valid. The chart should be relevant to the query and the provided data.
+Ensure the JSON is valid. The chart should be relevant to the query and include clear titles, labels, and explanations.
 First, provide the textual answer to the query, then, if applicable, provide the JSON chart data.
 `;
 
@@ -737,9 +861,7 @@ First, provide the textual answer to the query, then, if applicable, provide the
                 response += '\nThis is a basic analysis. For more sophisticated insights, please provide an API key.';
                 
                 return response;
-            }
-
-            // Parse LLM response for chart JSON
+            }            // Parse LLM response for chart JSON
             function parseLLMChartResponse(responseText) {
                 try {
                     // More flexible regex to capture JSON block
@@ -754,12 +876,22 @@ First, provide the textual answer to the query, then, if applicable, provide the
                         console.warn("Parsed JSON for chart is missing required fields:", chartConfig);
                         return null;
                     }
+                    
                     console.log("No JSON block found in LLM response with ```json ... ``` markers.");
+                    return null;
                 } catch (error) {
                     console.error("Error parsing chart JSON from LLM response:", error);
                     return null;
                 }
-                return null;
+            }            // Parse referenced document numbers from LLM response
+            function parseReferencedDocs(text) {
+                const regex = /Document\s*#(\d+)/g;
+                let match;
+                const docs = [];
+                while ((match = regex.exec(text)) !== null) {
+                    docs.push(parseInt(match[1], 10));
+                }
+                return [...new Set(docs)];
             }
 
             // Render chart from LLM data
@@ -777,6 +909,67 @@ First, provide the textual answer to the query, then, if applicable, provide the
                 }
 
                 try {
+                    // Enhance chart configuration with better defaults
+                    if (!chartConfig.options) {
+                        chartConfig.options = {};
+                    }
+                    
+                    // Ensure responsive and maintainable aspect ratio
+                    chartConfig.options.responsive = true;
+                    chartConfig.options.maintainAspectRatio = false;
+                    
+                    // Add plugins for better titles if not provided
+                    if (!chartConfig.options.plugins) {
+                        chartConfig.options.plugins = {};
+                    }
+                    
+                    // Ensure there's a title
+                    if (!chartConfig.options.plugins.title) {
+                        chartConfig.options.plugins.title = {
+                            display: true,
+                            text: 'Data Visualization',
+                            font: { size: 18, weight: 'bold' }
+                        };
+                    }
+                    
+                    // Add legend configuration if not provided
+                    if (!chartConfig.options.plugins.legend) {
+                        chartConfig.options.plugins.legend = {
+                            display: true,
+                            position: 'top',
+                            labels: { 
+                                boxWidth: 15,
+                                padding: 15
+                            }
+                        };
+                    }
+                    
+                    // Ensure scales have titles
+                    if (chartConfig.type === 'bar' || chartConfig.type === 'line') {
+                        if (!chartConfig.options.scales) {
+                            chartConfig.options.scales = {
+                                y: { beginAtZero: true },
+                                x: {}
+                            };
+                        }
+                        
+                        // Add axis titles if not present
+                        if (!chartConfig.options.scales.y.title) {
+                            chartConfig.options.scales.y.title = {
+                                display: true,
+                                text: 'Value'
+                            };
+                        }
+                        
+                        if (!chartConfig.options.scales.x.title) {
+                            chartConfig.options.scales.x.title = {
+                                display: true,
+                                text: 'Category'
+                            };
+                        }
+                    }
+                    
+                    // Create the chart with enhanced config
                     llmChart = new Chart(ctx, chartConfig);
                     document.getElementById('llmChartMessage').classList.add('hidden'); // Hide message on success
                 } catch (error) {
@@ -803,8 +996,7 @@ First, provide the textual answer to the query, then, if applicable, provide the
                 if (value instanceof Date) return value.toLocaleDateString();
                 return JSON.stringify(value);
             }
-            
-            function convertMarkdownToHtml(text) {
+              function convertMarkdownToHtml(text) {
                 if (!text) return '';
                 
                 // Convert bullet points
@@ -812,23 +1004,92 @@ First, provide the textual answer to the query, then, if applicable, provide the
                 text = text.replace(/^[ ]*- (.*)$/gm, '<li>$1</li>');
                 
                 // Convert bold text
-                text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>');
                 
                 // Convert italic text
-                text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                text = text.replace(/\*(.*?)\*/g, '<em class="italic text-gray-700">$1</em>');
+
+                // Convert headers
+                text = text.replace(/^### (.*?)$/gm, '<h3 class="text-lg font-semibold text-gray-800 mt-4 mb-2">$1</h3>');
+                text = text.replace(/^## (.*?)$/gm, '<h2 class="text-xl font-bold text-gray-900 mt-5 mb-3">$1</h2>');
+                text = text.replace(/^# (.*?)$/gm, '<h1 class="text-2xl font-bold text-indigo-700 mt-6 mb-4">$1</h1>');
+
+                // Handle tables - basic table conversion
+                if (text.includes('|')) {
+                    const lines = text.split('\n');
+                    const tableLines = [];
+                    let inTable = false;
+                    let tableHTML = '<div class="overflow-x-auto mt-4 mb-4"><table class="min-w-full divide-y divide-gray-300 border border-gray-200">';
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+                            if (!inTable) {
+                                inTable = true;
+                                tableHTML += '<thead class="bg-gray-50"><tr>';
+                                
+                                // Process header row
+                                const headerCells = lines[i].trim().split('|').filter(cell => cell.trim() !== '');
+                                headerCells.forEach(cell => {
+                                    tableHTML += `<th class="px-3 py-2 text-sm font-medium text-gray-900">${cell.trim()}</th>`;
+                                });
+                                
+                                tableHTML += '</tr></thead><tbody class="divide-y divide-gray-200 bg-white">';
+                                i++; // Skip the separator line
+                            } else {
+                                // Process data rows
+                                tableHTML += '<tr>';
+                                const cells = lines[i].trim().split('|').filter(cell => cell.trim() !== '');
+                                cells.forEach(cell => {
+                                    tableHTML += `<td class="px-3 py-2 text-sm text-gray-700">${cell.trim()}</td>`;
+                                });
+                                tableHTML += '</tr>';
+                            }
+                            
+                            tableLines.push(i);
+                        } else if (inTable) {
+                            inTable = false;
+                            tableHTML += '</tbody></table></div>';
+                            text = text.replace(lines.slice(tableLines[0], i).join('\n'), tableHTML);
+                            tableLines.length = 0;
+                            tableHTML = '<div class="overflow-x-auto mt-4 mb-4"><table class="min-w-full divide-y divide-gray-300 border border-gray-200">';
+                        }
+                    }
+                    
+                    if (inTable) {
+                        tableHTML += '</tbody></table></div>';
+                        text = text.replace(lines.slice(tableLines[0]).join('\n'), tableHTML);
+                    }
+                }
                 
                 // Wrap lists in ul tags
                 if (text.includes('<li>')) {
-                    text = '<ul class="list-disc pl-5 mb-3">' + text + '</ul>';
+                    text = '<ul class="list-disc pl-6 my-4 space-y-1">' + text + '</ul>';
                 }
                 
                 return text;
             }
             
             function beautifyResponse(text) {
-                return text.split('\n')
+                // Special handling for code blocks
+                let processedText = text;
+                
+                // Handle code blocks with language specification (```python, ```javascript, etc.)
+                processedText = processedText.replace(/```(\w+)?\n([\s\S]*?)```/g, 
+                    '<pre class="bg-gray-800 text-white p-4 rounded-md overflow-x-auto my-4"><code class="language-$1">$2</code></pre>');
+                
+                // Handle inline code
+                processedText = processedText.replace(/`([^`]+)`/g, 
+                    '<code class="bg-gray-100 text-indigo-600 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+                
+                return processedText.split('\n')
                     .filter(p => p.trim())
-                    .map(p => `<p class="mb-3">${convertMarkdownToHtml(p)}</p>`)
+                    .map(p => {
+                        if (p.startsWith('<h1') || p.startsWith('<h2') || p.startsWith('<h3') || 
+                            p.startsWith('<ul') || p.startsWith('<pre') || p.startsWith('<div')) {
+                            return convertMarkdownToHtml(p);
+                        }
+                        return `<p class="mb-4 leading-relaxed text-gray-700">${convertMarkdownToHtml(p)}</p>`;
+                    })
                     .join('');
             }
             
@@ -843,10 +1104,17 @@ First, provide the textual answer to the query, then, if applicable, provide the
                 resultsArea.style.display = 'block';
                 loader.style.display = 'none';
             }
-            
-            // Tab navigation for charts
+              // Tab navigation for charts
             const tabs = document.querySelectorAll('#chartPanel button');
             const chartContainers = document.querySelectorAll('.chart-container');
+            
+            // Initialize LLM tab as default
+            document.getElementById('chart-distribution').classList.add('hidden');
+            document.getElementById('chart-llm').classList.remove('hidden');
+            document.getElementById('tab-distribution').classList.remove('border-indigo-500', 'text-indigo-600', 'font-medium');
+            document.getElementById('tab-distribution').classList.add('text-gray-600', 'hover:text-gray-800', 'hover:border-gray-300');
+            document.getElementById('tab-llm').classList.add('border-indigo-500', 'text-indigo-600', 'font-medium');
+            document.getElementById('tab-llm').classList.remove('text-gray-600', 'hover:text-gray-800', 'hover:border-gray-300');
             
             tabs.forEach(tab => {
                 tab.addEventListener('click', () => {
