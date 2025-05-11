@@ -89,39 +89,30 @@
             
             <!-- Two-column layout for docs and charts -->
             <div id="resultsPanels" class="flex flex-col md:flex-row md:space-x-4">
-                <!-- Retrieved Documents panel -->
-                <div id="retrievedDocs" class="w-full md:w-1/2 mb-6">
-                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Retrieved Documents:</h3>
-                    <div id="docsContainer"></div>
+                <!-- Documents Panel -->
+                <div id="retrievedDocs" class="w-full md:w-1/2 p-4 border border-gray-200 rounded-md bg-white">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-700">Retrieved Documents</h3>
+                    <div id="docsContainer" class="max-h-96 overflow-y-auto"></div>
                 </div>
                 
-                <!-- Chart panel -->
-                <div id="chartPanel" class="w-full md:w-1/2 mb-6">
-                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Data Analysis:</h3>
-                    
-                    <!-- Chart navigation tabs -->
-                    <div class="flex border-b border-gray-200 mb-4">
-                        <button id="tab-distribution" class="px-4 py-2 border-b-2 border-indigo-500 text-indigo-600 font-medium">Distribution</button>
-                        <button id="tab-trends" class="px-4 py-2 text-gray-600 hover:text-gray-800">Trends</button>
-                        <button id="tab-relationships" class="px-4 py-2 text-gray-600 hover:text-gray-800">Relationships</button>
+                <!-- Charts Panel -->
+                <div id="chartPanel" class="w-full md:w-1/2 p-4 border border-gray-200 rounded-md bg-white mt-4 md:mt-0">
+                    <div class="border-b border-gray-200 mb-4">
+                        <nav class="-mb-px flex space-x-4" aria-label="Tabs">
+                            <button id="tab-distribution" type="button" class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-indigo-500 text-indigo-600">
+                                Pattern Analysis
+                            </button>
+                            <button id="tab-llm" type="button" class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-600 hover:text-gray-800 hover:border-gray-300">
+                                LLM Visualization
+                            </button>
+                        </nav>
                     </div>
-                    
-                    <!-- Chart containers -->
                     <div id="chart-distribution" class="chart-container">
-                        <canvas id="distributionChart" class="w-full h-64"></canvas>
+                        <canvas id="distributionChart" height="300"></canvas>
                     </div>
-                    
-                    <div id="chart-trends" class="chart-container hidden">
-                        <canvas id="trendsChart" class="w-full h-64"></canvas>
-                    </div>
-                    
-                    <div id="chart-relationships" class="chart-container hidden">
-                        <canvas id="relationshipsChart" class="w-full h-64"></canvas>
-                    </div>
-                    
-                    <!-- Chart insights -->
-                    <div id="chartInsights" class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded text-sm text-gray-600">
-                        Select a column to visualize insights
+                    <div id="chart-llm" class="chart-container hidden">
+                        <canvas id="llmChartCanvas" height="300"></canvas>
+                        <div id="llmChartMessage" class="text-center text-gray-500 py-10">LLM visualization will appear here.</div>
                     </div>
                 </div>
             </div>
@@ -159,6 +150,7 @@
             let apiKey = '';
             let apiType = 'openai';
             let chart = null;
+            let llmChart = null; // Added for LLM generated chart
             
             // Check for saved API key
             const savedApiKey = localStorage.getItem('api_key');
@@ -188,17 +180,43 @@
                 loader.style.display = 'block';
                 
                 const reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = function(event) {
                     try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, {type: 'array'});
+                        const data = event.target.result;
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
                         
-                        // Get first sheet
-                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                        
-                        // Convert to JSON
-                        excelData = XLSX.utils.sheet_to_json(worksheet);
-                        console.log('Excel data loaded:', excelData.length, 'rows');
+                        // Convert to JSON, ensuring dates are parsed as JS Date objects
+                        excelData = XLSX.utils.sheet_to_json(worksheet, { cellDates: true, raw: false });
+                        console.log('Excel data loaded (cellDates:true):', excelData.length, 'rows');
+
+                        // Post-process to validate dates and attempt parsing common date strings
+                        excelData = excelData.map(row => {
+                            for (const key in row) {
+                                const value = row[key];
+                                if (value instanceof Date) {
+                                    if (isNaN(value.getTime())) {
+                                        // console.warn(`Invalid Date object for key ${key} in row:`, row);
+                                        // Keep it as is; formatContextForLLM will handle it
+                                    }
+                                } else if (typeof value === 'string') {
+                                    // Attempt to parse common date string patterns if cellDates didn't catch it
+                                    // This regex is a basic example; more robust parsing might be needed for diverse formats
+                                    if (value.match(/^(\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}[\/-]\d{1,2}[\/-]\d{1,2})$/)) {
+                                        const parsedDate = new Date(value);
+                                        if (!isNaN(parsedDate.getTime())) {
+                                            row[key] = parsedDate;
+                                        }
+                                    }
+                                }
+                            }
+                            return row;
+                        });
+
+                        if (excelData.length > 0) {
+                            console.log('First row after all date processing:', excelData[0]);
+                        }
                         
                         // Build search index
                         searchIndex = createSearchIndex(excelData);
@@ -271,6 +289,12 @@
                 responseDiv.innerHTML = '';
                 docsContainer.innerHTML = '';
                 errorArea.style.display = 'none';
+                document.getElementById('llmChartMessage').textContent = 'LLM visualization will appear here.';
+                document.getElementById('llmChartMessage').classList.remove('hidden');
+                if (llmChart) {
+                    llmChart.destroy();
+                    llmChart = null;
+                }
                 
                 // Show loader
                 loader.style.display = 'block';
@@ -288,18 +312,37 @@
                     updateChart(patterns);
                     
                     // Format context for LLM
-                    const context = formatContextForLLM(excelData); // Changed from searchResults to excelData
+                    const context = formatContextForLLM(excelData);
                     
                     // Generate LLM response
-                    let llmResponse;
+                    let fullLLMResponse;
                     if (apiType === 'browser') {
-                        llmResponse = generateBasicResponse(query, searchResults);
+                        fullLLMResponse = generateBasicResponse(query, searchResults);
                     } else {
-                        llmResponse = await generateLLMResponse(query, context);
+                        fullLLMResponse = await generateLLMResponse(query, context);
                     }
                     
-                    // Display response
-                    responseDiv.innerHTML = beautifyResponse(llmResponse);
+                    // Attempt to parse chart data first
+                    const chartData = parseLLMChartResponse(fullLLMResponse);
+                    
+                    // Prepare text for display (remove chart JSON if present)
+                    let textForDisplay = fullLLMResponse;
+                    if (chartData) {
+                        // Remove the matched JSON block from the text to be displayed
+                        textForDisplay = fullLLMResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+                    }
+
+                    // Display text response
+                    responseDiv.innerHTML = beautifyResponse(textForDisplay);
+
+                    // Render LLM chart if data was parsed
+                    if (chartData) {
+                        renderLLMChart(chartData);
+                        // Message will be hidden by renderLLMChart on success
+                    } else {
+                        document.getElementById('llmChartMessage').textContent = 'No chart data provided by LLM or error in parsing.';
+                        document.getElementById('llmChartMessage').classList.remove('hidden');
+                    }
                     
                     // Show results area
                     resultsArea.style.display = 'block';
@@ -562,32 +605,61 @@
                 }
                 
                 let endpoint, payload;
-                
+                const chartInstruction = `
+If the query asks for a visualization, or if a chart would be helpful to illustrate the answer, provide a Chart.js compatible JSON object within a markdown code block like this:
+\`\`\`json
+{
+  "type": "bar", // e.g., bar, line, pie, doughnut, radar, polarArea, scatter, bubble
+  "data": {
+    "labels": ["Label1", "Label2", "Label3"],
+    "datasets": [{
+      "label": "Dataset Label",
+      "data": [10, 20, 30],
+      "backgroundColor": ["rgba(255, 99, 132, 0.2)", "rgba(54, 162, 235, 0.2)", "rgba(255, 206, 86, 0.2)"],
+      "borderColor": ["rgba(255, 99, 132, 1)", "rgba(54, 162, 235, 1)", "rgba(255, 206, 86, 1)"],
+      "borderWidth": 1
+    }]
+  },
+  "options": { // Optional: include if you want to customize options like scales, tooltips, legend
+    "responsive": true,
+    "maintainAspectRatio": false,
+    "scales": {
+      "y": {
+        "beginAtZero": true
+      }
+    }
+  }
+}
+\`\`\`
+Ensure the JSON is valid. The chart should be relevant to the query and the provided data.
+First, provide the textual answer to the query, then, if applicable, provide the JSON chart data.
+`;
+
                 if (apiType === 'openai') {
                     endpoint = 'https://api.openai.com/v1/chat/completions';
                     payload = {
-                        model: 'gpt-3.5-turbo',
+                        model: 'gpt-3.5-turbo', // Consider gpt-4 for better JSON generation if available
                         messages: [
-                            {role: 'system', content: 'You are a helpful assistant analyzing Excel data.'},
-                            {role: 'user', content: `Based on the following data:\n${context}\n\nQuestion: ${query}`}
+                            {role: 'system', content: `You are a helpful assistant analyzing Excel data. ${chartInstruction}`},
+                            {role: 'user', content: `Based on the following data:\\n${context}\\n\\nQuestion: ${query}`}
                         ],
                         temperature: 0.7
                     };
                 } else if (apiType === 'anthropic') {
                     endpoint = 'https://api.anthropic.com/v1/messages';
                     payload = {
-                        model: 'claude-3-sonnet-20240229',
+                        model: 'claude-3-sonnet-20240229', // Or other Claude models
                         messages: [
-                            {role: 'user', content: `Based on the following data:\\n${context}\\n\\nQuestion: ${query}`}
+                            {role: 'user', content: `Based on the following data:\\n${context}\\n\\nQuestion: ${query}\\n\\n${chartInstruction}`}
                         ],
-                        max_tokens: 1000
+                        max_tokens: 2000 // Increased max_tokens for potentially larger JSON
                     };
                 } else if (apiType === 'gemini') {
                     endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
                     payload = {
                         contents: [{
                             parts: [{
-                                text: `Based on the following data:\\n${context}\\n\\nQuestion: ${query}`
+                                text: `Based on the following data:\\n${context}\\n\\nQuestion: ${query}\\n\\n${chartInstruction}`
                             }]
                         }],
                         generationConfig: {
@@ -595,7 +667,7 @@
                         }
                     };
                 } else {
-                    return generateBasicResponse(query, context);
+                    return generateBasicResponse(query, context); // No chart for browser-based
                 }
                 
                 const fetchHeaders = {
@@ -639,6 +711,8 @@
             function generateBasicResponse(query, searchResults) {
                 // This is a fallback when no API is available
                 const resultCount = searchResults.length;
+                document.getElementById('llmChartMessage').textContent = 'Chart generation is not available with browser-based LLM.';
+                document.getElementById('llmChartMessage').classList.remove('hidden');
                 
                 if (resultCount === 0) {
                     return `No results found for "${query}".`;
@@ -663,6 +737,57 @@
                 response += '\nThis is a basic analysis. For more sophisticated insights, please provide an API key.';
                 
                 return response;
+            }
+
+            // Parse LLM response for chart JSON
+            function parseLLMChartResponse(responseText) {
+                try {
+                    // More flexible regex to capture JSON block
+                    const match = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+                    if (match && match[1]) {
+                        const jsonString = match[1];
+                        const chartConfig = JSON.parse(jsonString);
+                        // Basic validation
+                        if (chartConfig.type && chartConfig.data && chartConfig.data.labels && chartConfig.data.datasets) {
+                            return chartConfig;
+                        }
+                        console.warn("Parsed JSON for chart is missing required fields:", chartConfig);
+                        return null;
+                    }
+                    console.log("No JSON block found in LLM response with ```json ... ``` markers.");
+                } catch (error) {
+                    console.error("Error parsing chart JSON from LLM response:", error);
+                    return null;
+                }
+                return null;
+            }
+
+            // Render chart from LLM data
+            function renderLLMChart(chartConfig) {
+                const llmChartCanvas = document.getElementById('llmChartCanvas');
+                if (!llmChartCanvas) {
+                    console.error("LLM Chart canvas not found");
+                    document.getElementById('llmChartMessage').textContent = 'Error: LLM Chart canvas element not found.';
+                    document.getElementById('llmChartMessage').classList.remove('hidden');
+                    return;
+                }
+                const ctx = llmChartCanvas.getContext('2d');
+                if (llmChart) {
+                    llmChart.destroy();
+                }
+
+                try {
+                    llmChart = new Chart(ctx, chartConfig);
+                    document.getElementById('llmChartMessage').classList.add('hidden'); // Hide message on success
+                } catch (error) {
+                    console.error("Error rendering LLM chart:", error);
+                    document.getElementById('llmChartMessage').textContent = `Error rendering LLM chart: ${error.message}`;
+                    document.getElementById('llmChartMessage').classList.remove('hidden');
+                    if (llmChart) { // Clean up if new Chart failed
+                        llmChart.destroy();
+                        llmChart = null;
+                    }
+                }
             }
             
             // Helper functions
@@ -735,15 +860,18 @@
                     // Remove active class from all tabs
                     tabs.forEach(t => {
                         t.classList.remove('border-indigo-500', 'text-indigo-600', 'font-medium');
-                        t.classList.add('text-gray-600', 'hover:text-gray-800');
+                        t.classList.add('text-gray-600', 'hover:text-gray-800', 'hover:border-gray-300'); // Consistent hover
                     });
                     
                     // Show the selected chart container
-                    document.getElementById(`chart-${target}`).classList.remove('hidden');
+                    const targetChartContainer = document.getElementById(`chart-${target}`);
+                    if (targetChartContainer) {
+                        targetChartContainer.classList.remove('hidden');
+                    }
                     
                     // Add active class to the selected tab
                     tab.classList.add('border-indigo-500', 'text-indigo-600', 'font-medium');
-                    tab.classList.remove('text-gray-600', 'hover:text-gray-800');
+                    tab.classList.remove('text-gray-600', 'hover:text-gray-800', 'hover:border-gray-300');
                 });
             });
         });
